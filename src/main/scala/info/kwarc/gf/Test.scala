@@ -116,39 +116,23 @@ abstract class DennisTest(prefixes : String*) extends Test(
 }
 
 object GFMMT extends DennisTest() {
+
   val dpath = DPath(URI.http colon "mathhub.info") / "Teaching" / "LBS"
-  val key = dpath ? "LogicSyntax" ? "correspondsTo"
-
-  def getGrammar(th : DeclaredTheory) = {
-    val strings = th.metadata.get(key).map(_.value.asInstanceOf[OMSemiFormal].toStr(true).filter(_!='"'))
-    println(strings)
-    Grammar(strings:_*)
-  }
-
-  private def get (s : String,th : DeclaredTheory) = th.get(LocalName(s)) match {
-    case c : Constant if c.df.isDefined => c.df.get
-    case c : Constant => c.toTerm
-  }
-
-  private def toOMDocRec(expr : GFExpr, th : DeclaredTheory) : Term = expr match {
-    case GFStr(s) => get(s,th)
-    case GFA(fun,args) => ApplySpine(get(fun,th),args.map(toOMDocRec(_,th)):_*)
-  }
-
-  def toOMDoc(expr : GFExpr, th : DeclaredTheory) = controller.simplifier.apply(toOMDocRec(expr,th),th.getInnerContext)
+  lazy val gf = new MMTGF
 
 
   override def run: Unit = {
+    controller.extman.addExtension(gf)
     val th = controller.get(dpath ? "three").asInstanceOf[DeclaredTheory]
     // println(getStrings(th))
 
-    val gr = getGrammar(th)
+    val gr = gf.getGrammar(th)
 
     println(gr.categories)
     println(gr.languages)
     val en = gr.languages.head._2
     val parse = en.parse("John loves the dog").head._1
-    println(toOMDoc(parse,th))
+    println(gf.toOMDoc(parse,th))
   }
 
 }
