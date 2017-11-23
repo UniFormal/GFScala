@@ -11,7 +11,9 @@ import org.grammaticalframework.pgf.PGF
 
 import scala.collection.immutable.HashMap
 
-class InstantiatedGrammar(pgf : PGF, val theory : DeclaredTheory, val asHashMap : HashMap[String,Constant]) extends Grammar(pgf)
+class InstantiatedGrammar(pgf : PGF, val theory : DeclaredTheory, val asHashMap : HashMap[String,Constant],mmtgf : MMTGF) extends Grammar(pgf) {
+  def toOMDoc(expr : GFExpr) = mmtgf.toOMDoc(this,expr)
+}
 
 class MMTGF extends Extension {
   override def logPrefix: String = "gf"
@@ -19,10 +21,10 @@ class MMTGF extends Extension {
   val dpath = DPath(URI.http colon "mathhub.info") / "Teaching" / "LBS"
   val key = dpath ? "LogicSyntax" ? "correspondsTo"
 
-  def getGrammar(th : DeclaredTheory) = {
+  def getGrammar(th : DeclaredTheory) : InstantiatedGrammar = {
     val strings = th.metadata.get(key).map(_.value.asInstanceOf[OMSemiFormal].toStr(true).filter(_!='"'))
     log(th.path + " -> " + strings.mkString(", "))
-    new InstantiatedGrammar(Grammar(strings:_*).pgf, th,theoryToMap(th))
+    new InstantiatedGrammar(Grammar(strings:_*).pgf, th,theoryToMap(th),this)
   }
 
   def getGrammar(mp : MPath) : InstantiatedGrammar = {

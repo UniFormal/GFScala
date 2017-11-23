@@ -132,7 +132,7 @@ object GFMMT extends DennisTest("gf") {
     println(gr.languages)
     val en = gr.languages.head._2
     val parse = en.parse("John loves the dog").head._1
-    println(gf.toOMDoc(gr,parse))
+    println(gr.toOMDoc(parse))
   }
 
 }
