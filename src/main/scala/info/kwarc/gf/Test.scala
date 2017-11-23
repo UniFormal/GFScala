@@ -64,7 +64,7 @@ abstract class Test(archivepath : String,
   controller.handleLine("extension info.kwarc.mmt.pvs.Plugin")
   // controller.handleLine("extension info.kwarc.mmt.metamath.Plugin")
   controller.handleLine("mathpath archive " + archivepath)
-  controller.handleLine("extension info.kwarc.mmt.api.ontology.AlignmentsServer " + alignmentspath)
+  // controller.handleLine("extension info.kwarc.mmt.api.ontology.AlignmentsServer " + alignmentspath)
 
 
   def doFirst : Unit = {}
@@ -108,7 +108,7 @@ abstract class Test(archivepath : String,
 abstract class DennisTest(prefixes : String*) extends Test(
   "/home/jazzpirate/work/MathHub",
   prefixes.toList,
-  "/home/jazzpirate/work/Stuff/Public",
+  "",
   Some(8080),
   true,
   Some("/home/jazzpirate/work/mmtlog.html")
