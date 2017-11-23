@@ -115,24 +115,24 @@ abstract class DennisTest(prefixes : String*) extends Test(
 ) {
 }
 
-object GFMMT extends DennisTest() {
+object GFMMT extends DennisTest("gf") {
 
-  val dpath = DPath(URI.http colon "mathhub.info") / "Teaching" / "LBS"
-  lazy val gf = new MMTGF
+  lazy val gf = {
+    val ret = new MMTGF
+    controller.extman.addExtension(ret)
+    ret
+  }
 
 
   override def run: Unit = {
-    controller.extman.addExtension(gf)
-    val th = controller.get(dpath ? "three").asInstanceOf[DeclaredTheory]
-    // println(getStrings(th))
 
-    val gr = gf.getGrammar(th)
+    val gr = gf.getGrammar(gf.dpath ? "three")
 
     println(gr.categories)
     println(gr.languages)
     val en = gr.languages.head._2
     val parse = en.parse("John loves the dog").head._1
-    println(gf.toOMDoc(parse,th))
+    println(gf.toOMDoc(gr,parse))
   }
 
 }

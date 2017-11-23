@@ -1,12 +1,17 @@
 package info.kwarc.gf
 
-import info.kwarc.mmt.api.{DPath, LocalName}
+import info.kwarc.mmt.api.{DPath, LocalName, MPath}
 import info.kwarc.mmt.api.frontend.Extension
 import info.kwarc.mmt.api.modules.DeclaredTheory
 import info.kwarc.mmt.api.objects.{OMSemiFormal, Term}
 import info.kwarc.mmt.api.symbols.Constant
 import info.kwarc.mmt.api.utils.URI
 import info.kwarc.mmt.lf.ApplySpine
+import org.grammaticalframework.pgf.PGF
+
+import scala.collection.immutable.HashMap
+
+class InstantiatedGrammar(pgf : PGF, val theory : DeclaredTheory, val asHashMap : HashMap[String,Constant]) extends Grammar(pgf)
 
 class MMTGF extends Extension {
   override def logPrefix: String = "gf"
@@ -16,19 +21,41 @@ class MMTGF extends Extension {
 
   def getGrammar(th : DeclaredTheory) = {
     val strings = th.metadata.get(key).map(_.value.asInstanceOf[OMSemiFormal].toStr(true).filter(_!='"'))
-    println(strings)
-    Grammar(strings:_*)
+    log(th.path + " -> " + strings.mkString(", "))
+    new InstantiatedGrammar(Grammar(strings:_*).pgf, th,theoryToMap(th))
   }
 
-  private def get (s : String,th : DeclaredTheory) = th.get(LocalName(s)) match {
-    case c : Constant if c.df.isDefined => c.df.get
-    case c : Constant => c.toTerm
+  def getGrammar(mp : MPath) : InstantiatedGrammar = {
+    controller.getO(mp) match {
+      case Some(th : DeclaredTheory) => getGrammar(th)
+      case _ => ???
+    }
   }
 
-  private def toOMDocRec(expr : GFExpr, th : DeclaredTheory) : Term = expr match {
-    case GFStr(s) => get(s,th)
-    case GFA(fun,args) => ApplySpine(get(fun,th),args.map(toOMDocRec(_,th)):_*)
+  private def theoryToMap(th : DeclaredTheory) = {
+    controller.simplifier(th)
+    val consts = th.getConstants ::: th.getIncludesWithoutMeta.map(controller.get).collect {
+      case t : DeclaredTheory =>
+        controller.simplifier(t)
+        t.getConstants
+    }.flatten
+    log(th.path + "\n" + consts.map(c => (c.name.toString,c)).mkString("\n"))
+    HashMap(consts.map(c => (c.name.toString,c)):_*)
   }
 
-  def toOMDoc(expr : GFExpr, th : DeclaredTheory) = controller.simplifier.apply(toOMDocRec(expr,th),th.getInnerContext)
+  private def getTerm (s : String,th : HashMap[String,Constant]) = th.get(s) match {
+    case Some(c : Constant) if c.df.isDefined => c.df.get
+    case Some(c : Constant) => c.toTerm
+    case _ => ???
+  }
+
+  private def toOMDocRec(expr : GFExpr, th : HashMap[String,Constant]) : Term = expr match {
+    case GFStr(s) => getTerm(s,th)
+    case GFA(fun,args) => ApplySpine(getTerm(fun,th),args.map(toOMDocRec(_,th)):_*)
+  }
+
+  def toOMDoc(gr : InstantiatedGrammar,expr : GFExpr) = controller.simplifier.apply(
+    toOMDocRec(expr,gr.asHashMap),
+    gr.theory.getInnerContext
+  )
 }
