@@ -1,30 +1,42 @@
 package info.kwarc.gf
 
+import info.kwarc.gf.util.{ConcasScala, asScala}
 import info.kwarc.mmt.api.{DPath, LocalName, MPath}
 import info.kwarc.mmt.api.frontend.Extension
 import info.kwarc.mmt.api.modules.DeclaredTheory
-import info.kwarc.mmt.api.objects.{OMSemiFormal, Term}
-import info.kwarc.mmt.api.symbols.Constant
-import info.kwarc.mmt.api.utils.URI
+import info.kwarc.mmt.api.objects._
+import info.kwarc.mmt.api.symbols.{Constant, FinalConstant}
+import info.kwarc.mmt.api.utils.{File, URI}
 import info.kwarc.mmt.lf.ApplySpine
-import org.grammaticalframework.pgf.PGF
+import org.grammaticalframework.pgf.{Concr, PGF}
 
 import scala.collection.immutable.HashMap
 
 class InstantiatedGrammar(pgf : PGF, val theory : DeclaredTheory, val asHashMap : HashMap[String,Constant],mmtgf : MMTGF) extends Grammar(pgf) {
-  def toOMDoc(expr : GFExpr) = mmtgf.toOMDoc(this,expr)
+  def toOMDoc(expr : GFExpr) : Term = mmtgf.toOMDoc(this,expr)
+
+  override def languages: HashMap[String, InstantiatedLanguage] =
+    HashMap(asScala(pgf.getLanguages).toList.map(p => (p._1,new InstantiatedLanguage(p._2,pgf,this,mmtgf))):_*)
+}
+
+class InstantiatedLanguage(conc : Concr, pgf : PGF, override val grammar : InstantiatedGrammar,mmtgf : MMTGF) extends Language(conc,pgf) {
+  def parseMMT(s : String) = mmtgf.parse(this,s)
 }
 
 class MMTGF extends Extension {
   override def logPrefix: String = "gf"
-
-  val dpath = DPath(URI.http colon "mathhub.info") / "Teaching" / "LBS"
-  val key = dpath ? "LogicSyntax" ? "correspondsTo"
+  private def present(tm : Term) = controller.presenter.asString(tm)
 
   def getGrammar(th : DeclaredTheory) : InstantiatedGrammar = {
-    val strings = th.metadata.get(key).map(_.value.asInstanceOf[OMSemiFormal].toStr(true).filter(_!='"'))
+    val fstrings = th.metadata.get(MMTGF.key).map(_.value.asInstanceOf[OMSemiFormal].toStr(true).filter(_!='"'))
+    val strings = controller.backend.resolveLogical(th.parent.doc.uri) match {
+      case Some((archive,_)) => fstrings.map(s => archive.root.resolve(s).toString)
+      case _ => fstrings
+    }
     log(th.path + " -> " + strings.mkString(", "))
-    new InstantiatedGrammar(Grammar(strings:_*).pgf, th,theoryToMap(th),this)
+    val gr = Grammar(strings:_*)
+    log("Languages: " + gr.languages.keys.mkString(", "))
+    new InstantiatedGrammar(gr.pgf, th,theoryToMap(th),this)
   }
 
   def getGrammar(mp : MPath) : InstantiatedGrammar = {
@@ -41,14 +53,23 @@ class MMTGF extends Extension {
         controller.simplifier(t)
         t.getConstants
     }.flatten
-    log(th.path + "\n" + consts.map(c => (c.name.toString,c)).mkString("\n"))
     HashMap(consts.map(c => (c.name.toString,c)):_*)
   }
 
+  private val trav = new StatelessTraverser {
+    override def traverse(t: Term)(implicit con: Context, state: State): Term = t match {
+      case OMS(gn) => controller.getO(gn) match {
+        case Some(fc : FinalConstant) if fc.df.isDefined => Traverser(this,fc.df.get)
+        case _ => t
+      }
+      case _ => Traverser(this,t)
+    }
+  }
+
   private def getTerm (s : String,th : HashMap[String,Constant]) = th.get(s) match {
-    case Some(c : Constant) if c.df.isDefined => c.df.get
-    case Some(c : Constant) => c.toTerm
-    case _ => ???
+    case Some(c : Constant) => trav(c.toTerm,Context.empty)
+    case _ =>
+      throw new Exception(s + " not known")
   }
 
   private def toOMDocRec(expr : GFExpr, th : HashMap[String,Constant]) : Term = expr match {
@@ -60,4 +81,17 @@ class MMTGF extends Extension {
     toOMDocRec(expr,gr.asHashMap),
     gr.theory.getInnerContext
   )
+
+  def parse(lang : InstantiatedLanguage, s : String) = {
+    val results = lang.parse(s)
+    log("Parsing \"" + s + "\": " + results.length + " Results:")
+    val ret = results.map(p => (toOMDoc(lang.grammar,p._1),p._2))
+    ret.foreach(p => log(" - " + present(p._1) + " (" + p._2 + ")"))
+    ret
+  }
+}
+
+object MMTGF {
+  val dpath = DPath(URI.http colon "mathhub.info") / "Teaching" / "LBS"
+  val key = dpath ? "LogicSyntax" ? "correspondsTo"
 }

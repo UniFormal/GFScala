@@ -117,22 +117,28 @@ abstract class DennisTest(prefixes : String*) extends Test(
 
 object GFMMT extends DennisTest("gf") {
 
+  def present(tm : Term) = controller.presenter.asString(tm)
+
   lazy val gf = {
     val ret = new MMTGF
     controller.extman.addExtension(ret)
     ret
   }
-
+  val mg = new ModelGenerator
 
   override def run: Unit = {
 
-    val gr = gf.getGrammar(gf.dpath ? "three")
+    val gr = gf.getGrammar(MMTGF.dpath ? "frag1log")
 
-    println(gr.categories)
-    println(gr.languages)
-    val en = gr.languages.head._2
-    val parse = en.parse("John loves the dog").head._1
-    println(gr.toOMDoc(parse))
+    val en = gr.languages("frag1SynEN")
+    val utterance = en.parseMMT("Prudence is the lecturer and Bertie liked the lecturer .").head._1
+    val query = en.parseMMT("Bertie liked Prudence .").head._1
+    val query2 = en.parseMMT("Prudence liked Bertie .").head._1
+    println("Utterance: " + present(utterance))
+    println("Models:")
+    mg.models(utterance).map(_.map(present)) foreach (s => println(" - " + s))
+    println("Bertie liked Prudence: " + mg.prove(query,utterance).isEmpty)
+    println("Prudence liked Bertie: Countermodels: " + mg.prove(query2,utterance).map(_.map(present).mkString("[",", ","]")).mkString(", "))
   }
 
 }

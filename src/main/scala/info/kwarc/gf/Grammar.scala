@@ -25,12 +25,12 @@ object Grammar {
     val rets = filenames.map(makeString)
     val parent = rets.head._2.up
     val command = "gf" :: "-make" :: rets.flatMap(_._1).map(parent.relativize(_).toString).toList
-    println(parent + " : " + command.mkString(" "))
+    // println(parent + " : " + command.mkString(" "))
     val ret = ShellCommand.runIn(parent, command :_*)
     ret foreach println
     val ofile = parent / rets.head._1.head.setExtension("pgf").name
     val file = if (ofile.exists()) ofile else ofile.up.children.find(_.getExtension contains "pgf").getOrElse(throw ???)
-    println(file)
+    // println(file)
     new Grammar(PGF.readPGF(file.toString()))
   }
 

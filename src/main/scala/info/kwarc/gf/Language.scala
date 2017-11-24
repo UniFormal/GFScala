@@ -4,12 +4,14 @@ import info.kwarc.gf.util._
 import org.grammaticalframework.pgf.{BIND, Bracket, Concr, PGF}
 
 class Language(private[gf] val conc : Concr,private[gf] val pgf : PGF) {
-  private val grammar = new Grammar(pgf)
+  val grammar = new Grammar(pgf)
 
   def parse(s : String) : List[(GFExpr,Double)] = {
     val epls = conc.parse(pgf.getStartCat,s)
     epls.map(ep => (ExpasScala(ep.getExpr),ep.getProb))
   }
+
+  def lexicon : List[String] = conc.fullFormLexicon.map(_.getForm)
 
   def canLinearize(s : String) : Boolean = conc.hasLinearization(s)
 
