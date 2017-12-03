@@ -93,6 +93,17 @@ abstract class Test(archivepath : String,
       Future {Run.main(Array())}(scala.concurrent.ExecutionContext.global)
       Thread.sleep(1000)
     }
+    
+    // Explicity load the native library jpgf and *all* its dependent native libraries
+    // in advance before jpgf.jar loads "jpgf" alone.
+    // This fixes the error "Can't find dependent libraries" on Windows when code within
+    // jpgf.jar tries to load the native lib "jpgf" without its dependencies beforehand.
+    // https://stackoverflow.com/questions/1087054/jni-dependent-libraries/2906862#2906862.
+    System.loadLibrary("libgu-0")
+    System.loadLibrary("libpgf-0")
+    System.loadLibrary("libsg-0")
+    System.loadLibrary("jpgf")
+    
     run
   } catch {
     case e: api.Error => println(e.toStringLong)
