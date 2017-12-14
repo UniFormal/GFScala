@@ -142,8 +142,12 @@ object GFMMT extends DennisTest("gf") {
 
   override def run: Unit = {
 
-    val gr = gf.getGrammar(MMTGF.dpath ? "frag1log")
-
+    val gr = gf.getGrammar(MMTGF.dpath ? "Frag4")
+    val en = gr.languages("frag4EN")
+    val utterance = en.parseMMT("it is not the case that Bertie is the lecturer with a book .").head._1
+    println(utterance)
+    mg.models(utterance).map(_.present(present)) foreach (s => println(" - " + s))
+    /*
     val en = gr.languages("frag1SynEN")
     val utterance = en.parseMMT("Prudence is the lecturer and Bertie liked the lecturer .").head._1
     val query = en.parseMMT("Bertie liked Prudence .").head._1
@@ -153,6 +157,7 @@ object GFMMT extends DennisTest("gf") {
     mg.models(utterance).map(_.map(present)) foreach (s => println(" - " + s))
     println("Bertie liked Prudence: " + mg.prove(query,utterance).isEmpty)
     println("Prudence liked Bertie: Countermodels: " + mg.prove(query2,utterance).map(_.map(present).mkString("[",", ","]")).mkString(", "))
+    */
   }
 
 }

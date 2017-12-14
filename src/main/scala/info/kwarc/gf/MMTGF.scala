@@ -5,9 +5,10 @@ import info.kwarc.mmt.api.{DPath, LocalName, MPath}
 import info.kwarc.mmt.api.frontend.Extension
 import info.kwarc.mmt.api.modules.DeclaredTheory
 import info.kwarc.mmt.api.objects._
+import Conversions._
 import info.kwarc.mmt.api.symbols.{Constant, FinalConstant}
 import info.kwarc.mmt.api.utils.{File, URI}
-import info.kwarc.mmt.lf.ApplySpine
+import info.kwarc.mmt.lf.{ApplySpine, Lambda}
 import org.grammaticalframework.pgf.{Concr, PGF}
 
 import scala.collection.immutable.HashMap
@@ -65,6 +66,28 @@ class MMTGF extends Extension {
       case _ => Traverser(this,t)
     }
   }
+  import Convenience._
+  private def postProc(t : Term) : Term = t match {
+    case forall(v,bd) or r =>
+      val (w,sub) = Context.pickFresh(Context((bd.freeVars.filterNot(_ == v) ::: r.freeVars).map(VarDecl(_,None,None,None,None)):_*),v)
+      forall(w,postProc(bd^?sub or r))
+    case not(forall(v,bd)) or r =>
+      val (w,sub) = Context.pickFresh(Context((bd.freeVars.filterNot(_ == v) ::: r.freeVars).map(VarDecl(_,None,None,None,None)):_*),v)
+      not(forall(w,postProc(not(postProc(not(bd^?sub)) or r))))
+    case r or forall(v,bd) =>
+      postProc(forall(v,bd) or r)
+    case r or not(forall(v,bd)) =>
+      postProc(not(forall(v,bd)) or r)
+    case not(not(a)) =>
+      postProc(a)
+    case ApplySpine(OMS(Eq.predpath),List(Lambda(p,_,ApplySpine(OMV(p2),a :: Nil)),Lambda(q,_,ApplySpine(OMV(q2),b :: Nil))))
+      if p == p2 && q == q2 => Eq(a,b)
+    case _ => t
+  }
+
+  private val postProcTrav = new StatelessTraverser {
+    override def traverse(t: Term)(implicit con: Context, state: State): Term = postProc(Traverser(this,t))
+  }
 
   private def getTerm (s : String,th : HashMap[String,Constant]) = th.get(s) match {
     case Some(c : Constant) => trav(c.toTerm,Context.empty)
@@ -77,10 +100,10 @@ class MMTGF extends Extension {
     case GFA(fun,args) => ApplySpine(getTerm(fun,th),args.map(toOMDocRec(_,th)):_*)
   }
 
-  def toOMDoc(gr : InstantiatedGrammar,expr : GFExpr) = controller.simplifier.apply(
+  def toOMDoc(gr : InstantiatedGrammar,expr : GFExpr) = postProcTrav(controller.simplifier.apply(
     toOMDocRec(expr,gr.asHashMap),
     gr.theory.getInnerContext
-  )
+  ),Context.empty)
 
   def parse(lang : InstantiatedLanguage, s : String) = {
     val results = lang.parse(s)
